@@ -1,5 +1,5 @@
 [package]
-name = "drupal-kit"
+name = "drupal_kit"
 version = "0.1.0"
 edition = "2021"
 
