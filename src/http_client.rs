@@ -6,6 +6,7 @@ use reqwest::{Body, Client, Method, RequestBuilder, Response};
 use serde::de::DeserializeOwned;
 
 /// Additional option for request.
+#[derive(Clone)]
 pub enum HttpRequestOption {
     /// Adds a HTTP header with name and value to the request.
     Header(HeaderName, HeaderValue),
@@ -15,6 +16,9 @@ pub enum HttpRequestOption {
     /// Disables invocation of `before_request` and `after_request`
     /// for this request.
     NoBeforeAfter,
+    /// Disables the use of a authentication strategy therefore
+    /// making it an anonymous request.
+    Anonymous,
 }
 
 /// Defines an error coming from the HttpClient.
@@ -50,17 +54,18 @@ pub trait HttpClient {
             let mut no_before_after = false;
 
             // Handle additional request options.
-            for option in options {
+            for option in &options {
                 match option {
                     HttpRequestOption::Header(key, value) => {
-                        header_map.insert(key, value);
+                        header_map.insert(key.clone(), value.clone());
                     }
                     HttpRequestOption::BaseUrl(url) => {
-                        base_url = url;
+                        base_url = url.clone();
                     }
                     HttpRequestOption::NoBeforeAfter => {
                         no_before_after = true;
                     }
+                    _ => {}
                 }
             }
 
@@ -75,7 +80,7 @@ pub trait HttpClient {
             // This is to prevent infinite loops if a `before_request` handler
             // if the handler itself calls another `request`.
             let req_builder = if !no_before_after {
-                match self.before_request(req_builder).await {
+                match self.before_request(req_builder, path, options).await {
                     Ok(req_builder) => req_builder,
                     Err(err) => return Err(err),
                 }
@@ -129,7 +134,7 @@ pub trait HttpClient {
                     Ok(payload)
                 }
                 Err(err) => {
-                    return Err(err);
+                    Err(err)
                 }
             }
         }
@@ -142,6 +147,8 @@ pub trait HttpClient {
     fn before_request(
         &self,
         req_builder: RequestBuilder,
+        _path: &str,
+        _options: Vec<HttpRequestOption>,
     ) -> impl Future<Output = Result<RequestBuilder, ClientError>> + Send {
         async { Ok(req_builder) }
     }
@@ -162,7 +169,7 @@ pub trait HttpClient {
     /// # Example
     ///
     /// ```rust
-    /// use drupal_kit::HttpClient;
+    /// use drupal_kit::http_client::HttpClient;
     ///
     /// struct MyHttpClient {
     ///     http_client: reqwest::Client,

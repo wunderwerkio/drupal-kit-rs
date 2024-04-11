@@ -1,10 +1,10 @@
+pub mod auth;
 mod client;
-mod http_client;
+mod drupalkit_builder;
+pub mod http_client;
 
 pub use client::Drupalkit;
-pub use http_client::*;
+pub use drupalkit_builder::DrupalkitBuilder as Builder;
 
 #[cfg(feature = "simple-oauth")]
-mod simple_oauth;
-#[cfg(feature = "simple-oauth")]
-pub use simple_oauth::{AccessToken, SimpleOauthGrant, SimpleOauthTokenResponse};
+pub mod simple_oauth;

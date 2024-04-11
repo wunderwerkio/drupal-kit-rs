@@ -1,45 +1,44 @@
-use crate::HttpClient;
-use reqwest::Client;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
-#[cfg(feature = "simple-oauth")]
-use crate::simple_oauth::AccessToken;
+use crate::{
+    auth::AuthStrategy,
+    http_client::{HttpClient, HttpRequestOption},
+};
+use reqwest::Client;
 
 #[cfg(feature = "consumer")]
 const CONSUMER_HEADER_NAME: &str = "X-Consumer-ID";
 
 #[derive(Clone)]
-pub struct Drupalkit<'lstruct> {
-    http_client: Client,
+pub struct Drupalkit {
+    pub(crate) http_client: Client,
 
-    base_url: &'lstruct str,
+    pub(crate) base_url: String,
     #[cfg(feature = "consumer")]
-    client_id: &'lstruct str,
-    #[cfg(feature = "simple-oauth")]
-    pub(crate) access_token: Option<AccessToken>,
+    pub(crate) client_id: Option<String>,
+
+    pub(crate) auth_strategy: Option<Arc<Mutex<dyn AuthStrategy>>>,
 }
 
-impl<'lstruct> Drupalkit<'lstruct> {
-    pub fn new(
-        base_url: &'lstruct str,
-        #[cfg(feature = "consumer")] client_id: &'lstruct str,
-    ) -> Self {
-        let builder = reqwest::Client::builder();
-
-        let http_client = builder.danger_accept_invalid_certs(true).build().unwrap();
+impl Drupalkit {
+    pub fn new(base_url: &str, #[cfg(feature = "consumer")] client_id: Option<&str>) -> Self {
+        #[cfg(feature = "consumer")]
+        let client_id = client_id.map(|client_id| client_id.to_owned());
 
         Self {
-            http_client,
+            http_client: reqwest::Client::new(),
 
-            base_url,
+            base_url: base_url.to_owned(),
             #[cfg(feature = "consumer")]
             client_id,
-            #[cfg(feature = "simple-oauth")]
-            access_token: None,
+
+            auth_strategy: None,
         }
     }
 }
 
-impl HttpClient for Drupalkit<'_> {
+impl HttpClient for Drupalkit {
     fn get_http_client(&self) -> &reqwest::Client {
         &self.http_client
     }
@@ -48,35 +47,46 @@ impl HttpClient for Drupalkit<'_> {
         &self.base_url
     }
 
-    fn before_request(
+    async fn before_request(
         &self,
         req_builder: reqwest::RequestBuilder,
-    ) -> impl std::future::Future<Output = Result<reqwest::RequestBuilder, crate::ClientError>> + Send
-    {
+        path: &str,
+        options: Vec<HttpRequestOption>,
+    ) -> Result<reqwest::RequestBuilder, crate::http_client::ClientError> {
         // Add the X-Consumer-ID header with the client id to each request.
         #[cfg(feature = "consumer")]
-        let req_builder = { req_builder.header(CONSUMER_HEADER_NAME, self.client_id) };
+        let req_builder = match &self.client_id {
+            Some(client_id) => req_builder.header(CONSUMER_HEADER_NAME, client_id),
+            None => req_builder,
+        };
 
-        #[cfg(feature = "simple-oauth")]
-        let req_builder = match &self.access_token {
-            Some(access_token) => {
-                if !access_token.is_expired() {
-                    req_builder.bearer_auth(access_token.value.clone())
-                } else {
-                    req_builder
-                }
+        // Do nothing if request is anonymous.
+        for option in &options {
+            if let HttpRequestOption::Anonymous = option {
+                return Ok(req_builder);
+            }
+        }
+
+        // Set auth-info from strategy if set.
+        let auth_strategy = self.auth_strategy.clone();
+
+        let req_builder = match auth_strategy {
+            Some(auth_strategy) => {
+                let mut rw_auth_strategy = auth_strategy.lock().await;
+                rw_auth_strategy
+                    .set_auth_info(req_builder, path, options, self)
+                    .await?
             }
             None => req_builder,
         };
 
-        async { Ok(req_builder) }
+        Ok(req_builder)
     }
 
-    fn after_request(
+    async fn after_request(
         &self,
         response: reqwest::Response,
-    ) -> impl std::future::Future<Output = Result<reqwest::Response, crate::ClientError>> + Send
-    {
-        async { Ok(response) }
+    ) -> Result<reqwest::Response, crate::http_client::ClientError> {
+        Ok(response)
     }
 }
