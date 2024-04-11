@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use http::Method;
+use http::{header, HeaderValue, Method};
 use serde::Deserialize;
 
 use crate::{http_client::*, Drupalkit};
@@ -28,6 +28,7 @@ impl Drupalkit {
                 client_secret,
                 scopes,
             } => {
+                body_parts.insert("grant_type", "client_credentials".to_owned());
                 body_parts.insert("client_id", client_id);
                 body_parts.insert("client_secret", client_secret);
                 body_parts.insert("scopes", scopes.join(","));
@@ -38,6 +39,7 @@ impl Drupalkit {
                 refresh_token,
                 scopes,
             } => {
+                body_parts.insert("grant_type", "refresh_token".to_owned());
                 body_parts.insert("client_id", client_id);
                 body_parts.insert("client_secret", client_secret);
                 body_parts.insert("refresh_token", refresh_token);
@@ -67,7 +69,13 @@ impl Drupalkit {
                 // This MUST be an anonymous request, otherwise auth strategies would introduce
                 // stack overflows by calling the `request_token` method itself leading to an
                 // infinite loop!
-                vec![HttpRequestOption::Anonymous],
+                vec![
+                    HttpRequestOption::Anonymous,
+                    HttpRequestOption::Header(
+                        header::CONTENT_TYPE.to_owned(),
+                        HeaderValue::from_str("application/x-www-form-urlencoded")?,
+                    ),
+                ],
             )
             .await?;
 

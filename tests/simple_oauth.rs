@@ -12,7 +12,7 @@ async fn test_client_credentials_grant() {
     let mock = server.mock("POST", "/oauth/token")
         .with_status(200)
         .with_body(r#"{"token_type": "bearer", "expires_in": 3000, "access_token": "_access-token-value_"}"#)
-        .match_body(r#"client_id=_client_id_&client_secret=_client_secret_&scopes=some-scope,other-scope"#)
+        .match_body(r#"client_id=_client_id_&client_secret=_client_secret_&grant_type=client_credentials&scopes=some-scope,other-scope"#)
         .create_async()
         .await;
 
@@ -52,7 +52,7 @@ async fn test_client_credentials_grant_no_scopes() {
     let mock = server.mock("POST", "/oauth/token")
         .with_status(200)
         .with_body(r#"{"token_type": "bearer", "expires_in": 3000, "access_token": "_access-token-value_"}"#)
-        .match_body(r#"client_id=_client_id_&client_secret=_client_secret_"#)
+        .match_body(r#"client_id=_client_id_&client_secret=_client_secret_&grant_type=client_credentials"#)
         .create_async()
         .await;
 
@@ -93,7 +93,7 @@ async fn test_refresh_token_grant() {
     let mock = server.mock("POST", "/oauth/token")
         .with_status(200)
         .with_body(r#"{"token_type": "bearer", "expires_in": 3000, "access_token": "_access-token-value_"}"#)
-        .match_body(r#"client_id=_client_id_&client_secret=_client_secret_&refresh_token=_refresh-token_&scopes=some-scope,other-scope"#)
+        .match_body(r#"client_id=_client_id_&client_secret=_client_secret_&grant_type=refresh_token&refresh_token=_refresh-token_&scopes=some-scope,other-scope"#)
         .create_async()
         .await;
 

@@ -9,5 +9,5 @@ pub enum SimpleOauthGrant {
         client_secret: String,
         refresh_token: String,
         scopes: Vec<String>,
-    }
+    },
 }

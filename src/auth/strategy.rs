@@ -1,5 +1,8 @@
 use core::fmt;
-use std::{error, sync::Arc};
+use std::{
+    error::{self, Error},
+    sync::Arc,
+};
 
 use async_trait::async_trait;
 use reqwest::RequestBuilder;
@@ -9,22 +12,20 @@ use crate::{http_client::HttpRequestOption, Drupalkit};
 
 pub type AuthStrategyResult = Result<RequestBuilder, AuthStrategyError>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct AuthStrategyError {
-    msg: String,
+    source: Box<dyn Error + Send + Sync>,
 }
 
 impl AuthStrategyError {
-    pub fn new(msg: &str) -> Self {
-        Self {
-            msg: msg.to_owned(),
-        }
+    pub fn new(source: Box<dyn Error + Send + Sync>) -> Self {
+        Self { source }
     }
 }
 
 impl fmt::Display for AuthStrategyError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "could not set auth info for request: {}", self.msg)
+        write!(f, "could not set auth info for request: {}", self.source)
     }
 }
 

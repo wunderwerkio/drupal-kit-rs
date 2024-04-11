@@ -1,5 +1,8 @@
-use core::fmt::Debug;
-use std::{error::Error, future::Future};
+use core::fmt::{self, Debug};
+use std::{
+    error::{self, Error},
+    future::Future,
+};
 
 use http::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::{Body, Client, Method, RequestBuilder, Response};
@@ -23,6 +26,29 @@ pub enum HttpRequestOption {
 
 /// Defines an error coming from the HttpClient.
 pub type ClientError = Box<dyn Error + Send + Sync>;
+
+#[derive(Debug)]
+pub struct FailedRequestError {
+    response: Response,
+}
+
+impl From<Response> for FailedRequestError {
+    fn from(value: Response) -> Self {
+        Self { response: value }
+    }
+}
+
+impl fmt::Display for FailedRequestError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "http request failed with status code {}",
+            self.response.status()
+        )
+    }
+}
+
+impl error::Error for FailedRequestError {}
 
 /// Provides basic HTTP Client capabilities.
 ///
@@ -128,14 +154,17 @@ pub trait HttpClient {
         async move {
             match self.request(method, path, body, options).await {
                 Ok(response) => {
-                    let bytes = response.bytes().await?;
-                    let payload = serde_json::from_slice(&bytes)?;
+                    if response.status().is_success() {
+                        let bytes = response.bytes().await?;
+                        let payload = serde_json::from_slice(&bytes)?;
 
-                    Ok(payload)
+                        Ok(payload)
+                    } else {
+                        Err(Box::new(FailedRequestError::from(response))
+                            as Box<dyn Error + Send + Sync>)
+                    }
                 }
-                Err(err) => {
-                    Err(err)
-                }
+                Err(err) => Err(err),
             }
         }
     }
