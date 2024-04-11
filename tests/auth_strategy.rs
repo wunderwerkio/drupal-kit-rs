@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use drupal_kit::http_client::HttpClient;
 use drupal_kit::{auth::BasicAuthStrategy, Drupalkit};
 use http::Method;
