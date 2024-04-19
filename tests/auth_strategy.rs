@@ -1,3 +1,4 @@
+use drupal_kit::auth::BearerAuthStrategy;
 use drupal_kit::http_client::HttpClient;
 use drupal_kit::{auth::BasicAuthStrategy, Drupalkit};
 use http::Method;
@@ -26,6 +27,44 @@ async fn test_basic_auth() {
     let mut client = Drupalkit::new(&url, None);
 
     let auth_strategy = BasicAuthStrategy::new(username, Some(password));
+    client.set_auth_strategy(auth_strategy);
+
+    let res = client
+        .request(Method::GET, "/some-path", "", vec![])
+        .await
+        .expect("request must not fail");
+
+    mock.assert_async().await;
+
+    assert!(res.status().is_success());
+
+    let text = res.text().await.expect("must get body");
+    assert_eq!("world", text);
+}
+
+#[tokio::test]
+async fn test_bearer_auth() {
+    let mut server = mockito::Server::new_async().await;
+
+    let token = "abc123";
+
+    let mock = server
+        .mock("GET", "/some-path")
+        .with_status(200)
+        .with_body("world")
+        .match_header("Authorization", "Bearer abc123")
+        .create_async()
+        .await;
+
+    let url = server.url();
+
+    #[cfg(not(feature = "consumer"))]
+    let mut client = Drupalkit::new(&url);
+
+    #[cfg(feature = "consumer")]
+    let mut client = Drupalkit::new(&url, None);
+
+    let auth_strategy = BearerAuthStrategy::new(token);
     client.set_auth_strategy(auth_strategy);
 
     let res = client
