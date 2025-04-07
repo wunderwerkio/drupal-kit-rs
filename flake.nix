@@ -28,7 +28,7 @@
           ];
 
           buildInputs = with pkgs; [
-            openssl
+            #openssl
           ];
         };
 
