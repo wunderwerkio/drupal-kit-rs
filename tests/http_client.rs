@@ -1,6 +1,8 @@
 use drupal_kit::http::Method;
-use drupal_kit::http_client::HttpClient;
+use drupal_kit::http_client::{HttpClient, HttpRequestOption};
 use reqwest::Client;
+use http;
+use http::header;
 
 struct TestHttpClient {
     client: Client,
@@ -47,5 +49,38 @@ async fn test_request_json_adds_content_type_header() {
         client.request_json(Method::GET, "/test", "", vec![]).await;
 
     // The request should succeed because the mock expects the Content-Type header
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn test_request_json_custom_content_type() {
+    let mut server = mockito::Server::new_async().await;
+    let base_url = server.url();
+
+    // Create a mock that expects a custom Content-Type header
+    let _mock = server
+        .mock("GET", "/test")
+        .match_header("content-type", "application/xml")
+        .with_status(200)
+        .with_body("{}")
+        .create_async()
+        .await;
+
+    let client = TestHttpClient::new(base_url);
+
+    // Make a request with a custom Content-Type header
+    let result: Result<serde_json::Value, _> = client
+        .request_json(
+            Method::GET,
+            "/test",
+            "",
+            vec![HttpRequestOption::Header(
+                http::header::CONTENT_TYPE,
+                http::HeaderValue::from_static("application/xml"),
+            )],
+        )
+        .await;
+
+    // The request should succeed because the mock expects the custom Content-Type header
     assert!(result.is_ok());
 }
