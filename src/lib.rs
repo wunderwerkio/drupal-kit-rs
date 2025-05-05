@@ -8,6 +8,8 @@ pub use drupalkit_builder::DrupalkitBuilder as Builder;
 
 pub mod http {
     pub use http::Method;
+    pub use http::HeaderName;
+    pub use http::HeaderValue;
 }
 
 #[cfg(feature = "simple-oauth")]
