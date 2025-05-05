@@ -152,6 +152,13 @@ pub trait HttpClient {
         T: DeserializeOwned + Debug,
     {
         async move {
+            // Add Content-Type: application/json header by default
+            let mut options = options;
+            options.push(HttpRequestOption::Header(
+                HeaderName::from_static("content-type"),
+                HeaderValue::from_static("application/json"),
+            ));
+
             match self.request(method, path, body, options).await {
                 Ok(response) => {
                     if response.status().is_success() {
